@@ -17,6 +17,8 @@ class Document
 
   field :semantria_data, type: String
 
+  field :semantria_comments_data, type: String
+
   field :comment_data, type: Array
 
   validates :guardian_url, :guardian_data, :guardian_sanitized_data, :semantria_data, :presence => true

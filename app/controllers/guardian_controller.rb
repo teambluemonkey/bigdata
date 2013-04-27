@@ -1,4 +1,9 @@
 class SessionCallbackHandler < CallbackHandler
+
+  def initialize(thing = false)
+    @thing = thing
+  end
+
   def onRequest(sender, args)
     # puts "Put in a request: #{args}"
   end
@@ -6,6 +11,11 @@ class SessionCallbackHandler < CallbackHandler
   def onResponse(sender, args)
     # puts "Got a resposne: #{args}"
     $data_done = true
+
+    if (@thing)
+      $data_comments_done = true
+    end
+
   end
 
   def onError(sender, args)
@@ -46,8 +56,11 @@ class GuardianController < ApplicationController
       sanitized_result = nil
       semantria_result = nil
       $data_done = false
+      $data_comments_done = false
       wait_for_semantria = false
       comment_data = []
+      wait_for_semantria_comments = false
+      c_semantria_result = nil
 
       hydra = Typhoeus::Hydra.hydra
 
@@ -120,6 +133,32 @@ class GuardianController < ApplicationController
             comment_data << ActionView::Base.full_sanitizer.sanitize(comment).strip
           end
 
+          c_semantria_session = Session.new(Bigdata::Application.config.semantria_key, Bigdata::Application.config.semantria_secret, 'ForJusticeApp', true)
+
+          c_callback = SessionCallbackHandler.new(true)
+
+          c_semantria_session.setCallbackHandler(c_callback)
+
+          c_doc = {'id' => rand(10 ** 10).to_s.rjust(10, '0'), 'documents' => comment_data}
+
+          # Queues document for processing on Semantria service
+          c_status = c_semantria_session.queueCollection(c_doc)
+
+          puts "Status: #{c_status}"
+
+          if c_status == 202
+            puts "COMMENTS Document '#{c_doc['id']}' queued successfully."
+            wait_for_semantria_comments = true
+          end
+
+          c_semantria_result = c_semantria_session.getProcessedCollections()
+
+          begin
+            puts "Waiting comments..."
+            # ARG
+            sleep 0.1
+          end while (wait_for_semantria_comments && !$data_comments_done)
+
         end
 
         hydra.queue comment_request
@@ -136,6 +175,7 @@ class GuardianController < ApplicationController
       new_doc.guardian_data = json_data.to_json
       new_doc.guardian_sanitized_data = sanitized_data
       new_doc.semantria_data = semantria_result.to_json
+      new_doc.semantria_comments_data = c_semantria_result.to_json
       new_doc.comment_data = comment_data
       new_doc.save
 
@@ -163,6 +203,7 @@ class GuardianController < ApplicationController
       article_data: JSON.parse(displayed_doc.guardian_data),
       article_body: displayed_doc.guardian_sanitized_data,
       semantria_data: JSON.parse(displayed_doc.semantria_data),
+      semantria_comment_data: JSON.parse(displayed_doc.semantria_comments_data),
       display_data: displayed_doc.display_data,
       comment_data: displayed_doc.comment_data
     }
