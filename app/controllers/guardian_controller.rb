@@ -10,9 +10,14 @@ class SessionCallbackHandler < CallbackHandler
 
   def onResponse(sender, args)
     # puts "Got a resposne: #{args}"
+
+    # sleep 0.1
+
     $data_done = true
 
     if (@thing)
+      # sleep 0.1
+
       $data_comments_done = true
     end
 
@@ -87,7 +92,9 @@ class GuardianController < ApplicationController
 
         sanitized_data = ActionView::Base.full_sanitizer.sanitize(json_data["response"]["content"]["fields"]["body"]).strip
 
-        doc = {'id' => rand(10 ** 10).to_s.rjust(10, '0'), 'text' => sanitized_data}
+        doc_md5 = Digest::MD5.hexdigest(sanitized_data)
+
+        doc = {'id' => doc_md5, 'text' => sanitized_data}
 
         semantria_session = Session.new(Bigdata::Application.config.semantria_key, Bigdata::Application.config.semantria_secret, 'ForJusticeApp', true)
 
@@ -154,7 +161,9 @@ class GuardianController < ApplicationController
 
           c_semantria_session.setCallbackHandler(c_callback)
 
-          c_doc = {'id' => rand(10 ** 10).to_s.rjust(10, '0'), 'documents' => comment_data}
+          comment_md5 = Digest::MD5.hexdigest(comment_data.join(","))
+
+          c_doc = {'id' => comment_md5, 'documents' => comment_data}
 
           # Queues document for processing on Semantria service
           c_status = c_semantria_session.queueCollection(c_doc)
@@ -190,6 +199,7 @@ class GuardianController < ApplicationController
       # make a new one
       new_doc = Document.new
       new_doc.guardian_url = url.to_s
+      new_doc.guardian_comment_url = comment_url
       new_doc.guardian_data = json_data.to_json
       new_doc.guardian_sanitized_data = sanitized_data
       new_doc.semantria_data = semantria_result.to_json
@@ -216,11 +226,12 @@ class GuardianController < ApplicationController
     # end
 
     render json: {
+      id: displayed_doc.id,
       action: "show",
       article: displayed_doc.guardian_url,
       article_data: JSON.parse(displayed_doc.guardian_data),
       article_body: displayed_doc.guardian_sanitized_data,
-      semantria_data: displayed_doc.semantria_data ? JSON.parse(displayed_doc.semantria_data) : nil,
+      semantria_data: displayed_doc.semantria_data                  != "null" ? JSON.parse(displayed_doc.semantria_data)          : nil,
       semantria_comment_data: displayed_doc.semantria_comments_data != "null" ? JSON.parse(displayed_doc.semantria_comments_data) : nil, 
       display_data: displayed_doc.display_data,
       comment_data: displayed_doc.comment_data

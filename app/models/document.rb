@@ -11,6 +11,8 @@ class Document
 
   field :guardian_url, type: String
 
+  field :guardian_comment_url, type: String
+
   field :guardian_data, type: String
 
   field :guardian_sanitized_data, type: String
