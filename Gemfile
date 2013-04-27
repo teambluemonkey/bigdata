@@ -7,6 +7,7 @@ gem 'rails', '3.2.12'
 
 gem 'sqlite3'
 
+gem "mongoid", "~> 3.0.0"
 
 # Gems used only for assets and not required
 # in production environments by default.
@@ -29,10 +30,21 @@ gem 'jquery-rails'
 # gem 'jbuilder'
 
 # Use unicorn as the app server
-# gem 'unicorn'
+gem 'unicorn'
 
 # Deploy with Capistrano
 # gem 'capistrano'
 
 # To use debugger
 # gem 'debugger'
+
+gem 'wirble'
+gem 'hirb'
+
+gem 'active_model_serializers', "~> 0.7.0"
+
+gem 'guardian-content', :git => "https://github.com/chrsgrrtt/contentapi-ruby.git"
+
+gem 'rest-client'
+
+gem 'json'
