@@ -119,8 +119,10 @@ class GuardianController < ApplicationController
 
       hydra.queue guardian_request
 
-      unless comment_url.nil? || comment_url.blank?
+      if !comment_url.nil?
         # do comment as well
+
+        puts "COMMENTS GETTING YES"
 
         comment_request = Typhoeus::Request.new(comment_url)
 
@@ -162,6 +164,9 @@ class GuardianController < ApplicationController
         end
 
         hydra.queue comment_request
+      else
+
+        puts "COMMENTS NO"
 
       end
 
@@ -202,8 +207,8 @@ class GuardianController < ApplicationController
       article: displayed_doc.guardian_url,
       article_data: JSON.parse(displayed_doc.guardian_data),
       article_body: displayed_doc.guardian_sanitized_data,
-      semantria_data: JSON.parse(displayed_doc.semantria_data),
-      semantria_comment_data: JSON.parse(displayed_doc.semantria_comments_data),
+      semantria_data: displayed_doc.semantria_data ? JSON.parse(displayed_doc.semantria_data) : nil,
+      semantria_comment_data: displayed_doc.semantria_comments_data != "null" ? JSON.parse(displayed_doc.semantria_comments_data) : nil, 
       display_data: displayed_doc.display_data,
       comment_data: displayed_doc.comment_data
     }
