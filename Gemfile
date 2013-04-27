@@ -48,3 +48,7 @@ gem 'guardian-content', :git => "https://github.com/chrsgrrtt/contentapi-ruby.gi
 gem 'rest-client'
 
 gem 'json'
+
+gem 'nokogiri'
+
+gem 'typhoeus'

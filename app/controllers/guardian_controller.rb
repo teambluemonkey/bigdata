@@ -1,4 +1,4 @@
-  class SessionCallbackHandler < CallbackHandler
+class SessionCallbackHandler < CallbackHandler
   def onRequest(sender, args)
     # puts "Put in a request: #{args}"
   end
@@ -32,50 +32,103 @@ class GuardianController < ApplicationController
     # use guardian to get data out
 
     url = params[:id].gsub("http://www.guardian.co.uk", "")
+    comment_url = params[:comment_url]
 
     # look for doc in mongodb
     existing_doc = Document.where(guardian_url: url).first
 
     if existing_doc.nil?
 
-      data = RestClient.get "http://content.guardianapis.com#{url}", {:params => {"api-key" => Bigdata::Application.config.guardian_api_key, 'show-fields' => 'all', 'show-tags' => 'all'}}
-
-      json_data = JSON.parse(data)
-
-      # json_data["response"]["content"]["fields"]["body"] = ActionView::Base.full_sanitizer.sanitize(json_data["response"]["content"]["fields"]["body"])
-
-      sanitized_data = ActionView::Base.full_sanitizer.sanitize(json_data["response"]["content"]["fields"]["body"])
-
-      doc = {'id' => rand(10 ** 10).to_s.rjust(10, '0'), 'text' => sanitized_data}
-
-      semantria_session = Session.new(Bigdata::Application.config.semantria_key, Bigdata::Application.config.semantria_secret, 'ForJusticeApp', true)
-
-      callback = SessionCallbackHandler.new
-
-      semantria_session.setCallbackHandler(callback)
-
-      # Queues document for processing on Semantria service
-      status = semantria_session.queueDocument(doc)
-
+      #nasty
+      json_data = nil
+      semantria_data = nil
+      sanitized_data = nil
+      sanitized_result = nil
+      semantria_result = nil
       $data_done = false
-
       wait_for_semantria = false
+      comment_data = []
 
-      # puts "Status: #{status}"
-      puts "Status: #{status.inspect}"
-    
-      if status == 202
-        puts "Document '#{doc['id']}' queued successfully."
-        wait_for_semantria = true
+      hydra = Typhoeus::Hydra.hydra
+
+      guardian_request = Typhoeus::Request.new(
+        "http://content.guardianapis.com#{url}",
+        method: :get,
+        params: {
+          "api-key" => Bigdata::Application.config.guardian_api_key,
+          "show-fields" => "all",
+          "show-tags" => "all",
+        }
+      )
+
+      guardian_request.on_complete do |response|
+        # response.body
+
+        # puts response.body
+        # puts response
+        # puts response.inspect
+
+        json_data = JSON.parse(response.body)
+
+        # json_data["response"]["content"]["fields"]["body"] = ActionView::Base.full_sanitizer.sanitize(json_data["response"]["content"]["fields"]["body"])
+
+        sanitized_data = ActionView::Base.full_sanitizer.sanitize(json_data["response"]["content"]["fields"]["body"]).strip
+
+        doc = {'id' => rand(10 ** 10).to_s.rjust(10, '0'), 'text' => sanitized_data}
+
+        semantria_session = Session.new(Bigdata::Application.config.semantria_key, Bigdata::Application.config.semantria_secret, 'ForJusticeApp', true)
+
+        callback = SessionCallbackHandler.new
+
+        semantria_session.setCallbackHandler(callback)
+
+        # Queues document for processing on Semantria service
+        status = semantria_session.queueDocument(doc)
+
+        # puts "Status: #{status}"
+        puts "Status: #{status.inspect}"
+      
+        if status == 202
+          puts "Document '#{doc['id']}' queued successfully."
+          wait_for_semantria = true
+        end
+
+        semantria_result = semantria_session.getProcessedDocuments()
+
+        begin
+          puts "Waiting..."
+          # ARG
+          sleep 0.1
+        end while (wait_for_semantria && !$data_done)
+
+
       end
 
-      semantria_result = semantria_session.getProcessedDocuments()
+      hydra.queue guardian_request
 
-      begin
-        puts "Waiting..."
-        # ARG
-        sleep 0.1
-      end while (wait_for_semantria && !$data_done)
+      unless comment_url.nil? || comment_url.blank?
+        # do comment as well
+
+        comment_request = Typhoeus::Request.new(comment_url)
+
+        comment_request.on_complete do |response|
+
+          doc = Nokogiri::HTML(response.body)
+
+          doc.css('.d2-body').each do |node|
+            comment = node.inner_html
+            comment_data << ActionView::Base.full_sanitizer.sanitize(comment).strip
+          end
+
+        end
+
+        hydra.queue comment_request
+
+      end
+
+      hydra.run
+
+      # we has docs
 
       # make a new one
       new_doc = Document.new
@@ -83,11 +136,12 @@ class GuardianController < ApplicationController
       new_doc.guardian_data = json_data.to_json
       new_doc.guardian_sanitized_data = sanitized_data
       new_doc.semantria_data = semantria_result.to_json
+      new_doc.comment_data = comment_data
       new_doc.save
 
       displayed_doc = new_doc
 
-    else
+    else # existing
       displayed_doc = existing_doc
     end
 
@@ -109,7 +163,8 @@ class GuardianController < ApplicationController
       article_data: JSON.parse(displayed_doc.guardian_data),
       article_body: displayed_doc.guardian_sanitized_data,
       semantria_data: JSON.parse(displayed_doc.semantria_data),
-      display_data: displayed_doc.display_data
+      display_data: displayed_doc.display_data,
+      comment_data: displayed_doc.comment_data
     }
   end
 
