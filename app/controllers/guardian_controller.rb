@@ -64,6 +64,7 @@ class GuardianController < ApplicationController
       $data_comments_done = false
       wait_for_semantria = false
       comment_data = []
+      article_tags = []
       wait_for_semantria_comments = false
       c_semantria_result = nil
 
@@ -103,14 +104,17 @@ class GuardianController < ApplicationController
         semantria_session.setCallbackHandler(callback)
 
         #tags
-        article_tags = json_data["response"]["content"]["tags"]
+        raw_article_tags = json_data["response"]["content"]["tags"]
+        
         semantria_entities = []
-        article_tags.each do |tag|
+        raw_article_tags.each do |tag|
           entity = {}
           entity["name"] = tag["webTitle"]
           entity["type"] = tag["type"]
           semantria_entities.push(entity)
+          article_tags.push(tag["webTitle"])
         end
+
         puts "setting tags as entities"
         semantria_session.addEntities(semantria_entities)
         puts "finished setting tags as entities"
@@ -205,6 +209,7 @@ class GuardianController < ApplicationController
       new_doc.semantria_data = semantria_result.to_json
       new_doc.semantria_comments_data = c_semantria_result.to_json
       new_doc.comment_data = comment_data
+      new_doc.tags = article_tags.to_json
       new_doc.save
 
       displayed_doc = new_doc

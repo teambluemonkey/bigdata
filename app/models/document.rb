@@ -23,6 +23,8 @@ class Document
 
   field :comment_data, type: Array
 
+  field :tags, type: Array
+
   validates :guardian_url, :guardian_data, :guardian_sanitized_data, :semantria_data, :presence => true
 
   embeds_one :display_data
