@@ -1,4 +1,4 @@
-class SessionCallbackHandler < CallbackHandler
+  class SessionCallbackHandler < CallbackHandler
   def onRequest(sender, args)
     # puts "Put in a request: #{args}"
   end
@@ -91,6 +91,17 @@ class GuardianController < ApplicationController
       displayed_doc = existing_doc
     end
 
+    # Processing
+    # semantria_topics = semantria_result.first["topics"]
+    # puts "Semantria Result #{semantria_result}"
+    # sanitized_semantria = {"topics" => []}
+    
+
+    # semantria_topics.each do |topic|
+    #   if (topic['strength_score'] > 0.6)
+    #     sanitized_semantria["topics"].push( { "title" => "#{topic["title"]}" , "sentiment" => "#{topic["sentiment_polarity"]}"})
+    #   end
+    # end
 
     render json: {
       action: "show",
