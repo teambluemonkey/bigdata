@@ -95,6 +95,19 @@ class GuardianController < ApplicationController
 
         semantria_session.setCallbackHandler(callback)
 
+        #tags
+        article_tags = json_data["response"]["content"]["tags"]
+        semantria_entities = []
+        article_tags.each do |tag|
+          entity = {}
+          entity["name"] = tag["webTitle"]
+          entity["type"] = tag["type"]
+          semantria_entities.push(entity)
+        end
+        puts "setting tags as entities"
+        semantria_session.addEntities(semantria_entities)
+        puts "finished setting tags as entities"
+
         # Queues document for processing on Semantria service
         status = semantria_session.queueDocument(doc)
 
