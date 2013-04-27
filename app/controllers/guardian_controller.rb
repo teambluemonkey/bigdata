@@ -11,7 +11,13 @@ class GuardianController < ApplicationController
 
     data = RestClient.get "http://content.guardianapis.com#{url}", {:params => {"api-key" => Bigdata::Application.config.guardian_api_key, 'show-fields' => 'all', 'show-tags' => 'all'}}
 
-    render json: {action: "show", article: params[:id], article_data: JSON.parse(data)}
+    json_data = JSON.parse(data)
+
+    # json_data["response"]["content"]["fields"]["body"] = ActionView::Base.full_sanitizer.sanitize(json_data["response"]["content"]["fields"]["body"])
+
+    sanitized_data = ActionView::Base.full_sanitizer.sanitize(json_data["response"]["content"]["fields"]["body"])
+
+    render json: {action: "show", article: params[:id], article_data: json_data, article_body: sanitized_data}
   end
 
 end
