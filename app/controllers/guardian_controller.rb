@@ -33,46 +33,73 @@ class GuardianController < ApplicationController
 
     url = params[:id].gsub("http://www.guardian.co.uk", "")
 
-    data = RestClient.get "http://content.guardianapis.com#{url}", {:params => {"api-key" => Bigdata::Application.config.guardian_api_key, 'show-fields' => 'all', 'show-tags' => 'all'}}
+    # look for doc in mongodb
+    existing_doc = Document.where(guardian_url: url).first
 
-    json_data = JSON.parse(data)
+    if existing_doc.nil?
 
-    # json_data["response"]["content"]["fields"]["body"] = ActionView::Base.full_sanitizer.sanitize(json_data["response"]["content"]["fields"]["body"])
+      data = RestClient.get "http://content.guardianapis.com#{url}", {:params => {"api-key" => Bigdata::Application.config.guardian_api_key, 'show-fields' => 'all', 'show-tags' => 'all'}}
 
-    sanitized_data = ActionView::Base.full_sanitizer.sanitize(json_data["response"]["content"]["fields"]["body"])
+      json_data = JSON.parse(data)
 
-    doc = {'id' => rand(10 ** 10).to_s.rjust(10, '0'), 'text' => sanitized_data}
+      # json_data["response"]["content"]["fields"]["body"] = ActionView::Base.full_sanitizer.sanitize(json_data["response"]["content"]["fields"]["body"])
 
-    semantria_session = Session.new(Bigdata::Application.config.semantria_key, Bigdata::Application.config.semantria_secret, 'ForJusticeApp', true)
+      sanitized_data = ActionView::Base.full_sanitizer.sanitize(json_data["response"]["content"]["fields"]["body"])
 
-    callback = SessionCallbackHandler.new
+      doc = {'id' => rand(10 ** 10).to_s.rjust(10, '0'), 'text' => sanitized_data}
 
-    semantria_session.setCallbackHandler(callback)
+      semantria_session = Session.new(Bigdata::Application.config.semantria_key, Bigdata::Application.config.semantria_secret, 'ForJusticeApp', true)
 
-    # Queues document for processing on Semantria service
-    status = semantria_session.queueDocument(doc)
+      callback = SessionCallbackHandler.new
 
-    $data_done = false
+      semantria_session.setCallbackHandler(callback)
 
-    wait_for_semantria = false
+      # Queues document for processing on Semantria service
+      status = semantria_session.queueDocument(doc)
 
-    # puts "Status: #{status}"
-    puts "Status: #{status.inspect}"
-  
-    if status == 202
-      puts "Document '#{doc['id']}' queued successfully."
-      wait_for_semantria = true
+      $data_done = false
+
+      wait_for_semantria = false
+
+      # puts "Status: #{status}"
+      puts "Status: #{status.inspect}"
+    
+      if status == 202
+        puts "Document '#{doc['id']}' queued successfully."
+        wait_for_semantria = true
+      end
+
+      semantria_result = semantria_session.getProcessedDocuments()
+
+      begin
+        puts "Waiting..."
+        # ARG
+        sleep 0.1
+      end while (wait_for_semantria && !$data_done)
+
+      # make a new one
+      new_doc = Document.new
+      new_doc.guardian_url = url.to_s
+      new_doc.guardian_data = json_data.to_json
+      new_doc.guardian_sanitized_data = sanitized_data
+      new_doc.semantria_data = semantria_result.to_json
+      new_doc.save
+
+      displayed_doc = new_doc
+
+    else
+      displayed_doc = existing_doc
     end
 
-    semantria_result = semantria_session.getProcessedDocuments()
 
-    begin
-      puts "Waiting..."
-      # ARG
-      sleep 0.1
-    end while (wait_for_semantria && !$data_done)
-
-    render json: {action: "show", article: params[:id], article_data: json_data, article_body: sanitized_data, semantria_data: semantria_result}
+    render json: {
+      action: "show",
+      article: displayed_doc.guardian_url,
+      article_data: JSON.parse(displayed_doc.guardian_data),
+      article_body: displayed_doc.guardian_sanitized_data,
+      semantria_data: JSON.parse(displayed_doc.semantria_data),
+      display_data: displayed_doc.display_data
+    }
   end
 
 end
