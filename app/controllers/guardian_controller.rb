@@ -1,4 +1,4 @@
-class SessionCallbackHandler < CallbackHandler
+  class SessionCallbackHandler < CallbackHandler
   def onRequest(sender, args)
     # puts "Put in a request: #{args}"
   end
@@ -65,6 +65,17 @@ class GuardianController < ApplicationController
     end
 
     semantria_result = semantria_session.getProcessedDocuments()
+    semantria_topics = semantria_result.first["topics"]
+    puts "Semantria Result #{semantria_result}"
+    sanitized_semantria = {"topics" => []}
+    
+
+    semantria_topics.each do |topic|
+      if (topic['strength_score'] > 0.6)
+        sanitized_semantria["topics"].push( { "title" => "#{topic["title"]}" , "sentiment" => "#{topic["sentiment_polarity"]}"})
+      end
+    end
+    
 
     begin
       puts "Waiting..."
@@ -72,7 +83,7 @@ class GuardianController < ApplicationController
       sleep 0.1
     end while (wait_for_semantria && !$data_done)
 
-    render json: {action: "show", article: params[:id], article_data: json_data, article_body: sanitized_data, semantria_data: semantria_result}
+    render json: {action: "show", article: params[:id], article_data: json_data, article_body: sanitized_data, semantria_data: sanitized_semantria}
   end
 
 end
