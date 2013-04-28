@@ -111,8 +111,10 @@ class GuardianController < ApplicationController
           entity = {}
           entity["name"] = tag["webTitle"]
           entity["type"] = tag["type"]
-          semantria_entities.push(entity)
-          article_tags.push(tag["webTitle"])
+          if !article_tags.include?(tag["webTitle"])
+            semantria_entities.push(entity)
+            article_tags.push(tag["webTitle"])
+          end
         end
 
         puts "setting tags as entities"
@@ -199,6 +201,7 @@ class GuardianController < ApplicationController
       hydra.run
 
       # we has docs
+      puts "OK CREATING NEW DOC"
 
       # make a new one
       new_doc = Document.new
@@ -209,8 +212,13 @@ class GuardianController < ApplicationController
       new_doc.semantria_data = semantria_result.to_json
       new_doc.semantria_comments_data = c_semantria_result.to_json
       new_doc.comment_data = comment_data
-      new_doc.tags = article_tags.to_json
-      new_doc.save
+      new_doc.tags = article_tags
+      if new_doc.save
+        puts "DOC SAVED"
+      else 
+        puts "DOC NOT SAVED"
+	puts new_doc.errors.inspect
+      end
 
       displayed_doc = new_doc
 
@@ -239,7 +247,8 @@ class GuardianController < ApplicationController
       semantria_data: displayed_doc.semantria_data                  != "null" ? JSON.parse(displayed_doc.semantria_data)          : nil,
       semantria_comment_data: displayed_doc.semantria_comments_data != "null" ? JSON.parse(displayed_doc.semantria_comments_data) : nil, 
       display_data: displayed_doc.display_data,
-      comment_data: displayed_doc.comment_data
+      comment_data: displayed_doc.comment_data,
+      tags: displayed_doc.tags
     }
   end
 
